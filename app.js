@@ -1,4 +1,4 @@
-const APP_VERSION=6,COL={CPR:'#ff6b6b',BLS:'#4dabff',MED:'#c792ff',HEP:'#ffc72c'},DEFREPO='m9r1u5/Training-Scheduler',MODS={CPR:'CPR',BLS:'BLS',MED:'Medicals',HEP:'HEP B'};
+const APP_VERSION=7,COL={CPR:'#ff6b6b',BLS:'#4dabff',MED:'#c792ff',HEP:'#ffc72c'},DEFREPO='m9r1u5/Training-Scheduler',MODS={CPR:'CPR',BLS:'BLS',MED:'Medicals',HEP:'HEP B'};
 
 // Styles shipped inside app.js so "Update" delivers visual fixes without a new APK.
 (()=>{const s=document.createElement('style');s.textContent=`
@@ -28,13 +28,13 @@ const evs=(id,mod)=>db.events.filter(e=>e.pid===id&&(!mod||e.mod===mod)).sort((a
 function upcoming(){const t=today(),e=C.addDays(t,7);const l=db.events.filter(x=>!x.done&&x.date>=t&&x.date<=e&&!pp(x.pid).paused).sort((a,b)=>a.date.localeCompare(b.date));return l.map(x=>`<div>${nice(x.date)} · ${esc(pp(x.pid).name)} ${esc(pp(x.pid).surname)} · ${x.label}</div>`).join('')||'<div class="mut">Nothing due.</div>'}
 const pp=id=>db.people.find(p=>p.id===id);
 function dlg(html){const d=$('dlg');d.innerHTML=html;d.showModal();return d}
-const close=()=>$('dlg').close();
-function addDlg(){dlg(`<h3>Add to ${MODS[tab]}</h3><input id="fn" placeholder="Name"><br><br><input id="sn" placeholder="Surname"><br><br><label>First date (tap the calendar icon)</label><input id="fd" type="date" value="${today()}"><div class="row"><button onclick="close()">Cancel</button><button class="p" onclick="addPerson()">Save</button></div>`)}
+const closeDlg=()=>$('dlg').close();
+function addDlg(){dlg(`<h3>Add to ${MODS[tab]}</h3><input id="fn" placeholder="Name"><br><br><input id="sn" placeholder="Surname"><br><br><label>First date (tap the calendar icon)</label><input id="fd" type="date" value="${today()}"><div class="row"><button onclick="closeDlg()">Cancel</button><button class="p" onclick="addPerson()">Save</button></div>`)}
 function addPerson(){const n=$('fn').value.trim(),s=$('sn').value.trim(),d=$('fd').value;if(!n||!s||!d)return alert('Enter name, surname and a first date.');
  let p=db.people.find(x=>x.name.toLowerCase()===n.toLowerCase()&&x.surname.toLowerCase()===s.toLowerCase());const isNew=!p;
  if(isNew)p={id:'p'+db.seq++,name:n,surname:s,mods:[],paused:false};
  if(p.mods.includes(tab))return alert('Already on '+MODS[tab]+'.');
- if(!put(p,tab,d,false))return;if(isNew)db.people.push(p);p.mods.push(tab);save();close();view='list';render()}
+ if(!put(p,tab,d,false))return;if(isNew)db.people.push(p);p.mods.push(tab);save();closeDlg();view='list';render()}
 // Create events for one module from an anchor date; blocks (returns false) on a CPR/BLS clash.
 function put(p,mod,anchor,keepFrom,list=db.events){const g=C.generate(mod,anchor,db.holidays).map(e=>({id:'e'+db.seq++,pid:p.id,mod,date:e.date,label:e.label,slot:db.slot,done:null}));
  const base=list.filter(e=>e.pid===p.id);if(g.some(a=>base.some(b=>C.clash(a,b)))){alert('Conflict: already scheduled for something else');return false}
@@ -53,21 +53,21 @@ function person(m){const p=pp(pid),all=evs(p.id);cm=cm||today().slice(0,7);const
  +`<div class="row"><button class="p" onclick="share(msgYear('${p.id}'))">Year ahead message</button></div>`+((db.log||[]).filter(l=>l.pid===p.id).length?'<div class="card"><b>Reschedule history</b>'+db.log.filter(l=>l.pid===p.id).map(l=>`<div class="mut">${l.label}: ${nice(l.from)} → ${nice(l.to)} (${esc(l.why)})</div>`).join('')+'</div>':'')
  +Object.entries(MODS).filter(([k])=>!p.mods.includes(k)).map(([k,v])=>`<button class="item" onclick="tab='${k}';addTo('${p.id}')">+ Put on ${v}</button>`).join('')
  +`<div class="row">${p.paused?`<button class="g" onclick="resume('${p.id}')">Resume</button>`:`<button class="r" onclick="pause('${p.id}')">Pause</button>`}<button class="r" onclick="delP('${p.id}')">Delete</button></div>`}
-function addTo(id){dlg(`<h3>First date for ${MODS[tab]}</h3><input id="fd" type="date" value="${today()}"><div class="row"><button onclick="close()">Cancel</button><button class="p" onclick="addMod('${id}')">Save</button></div>`)}
-function addMod(id){const p=pp(id),d=$('fd').value;if(!d||!put(p,tab,d))return;p.mods.push(tab);save();close();render()}
-function editEv(id){const e=db.events.find(x=>x.id===id);dlg(`<h3>New date for ${e.label}</h3><p class="mut">Later events of this type are re-planned from the new date at the normal frequency, 10 years ahead.</p><select id="rs" style="width:100%"><option>Did not attend</option><option>On leave</option><option>Ill</option><option>Other</option></select><br><br><input id="nd" type="date" value="${e.date}"><div class="row"><button onclick="close()">Cancel</button><button class="p" onclick="if($('nd').value&&reschedule('${id}',$('nd').value,$('rs').value)){close();render()}">Save</button></div>`)}
-function slotEv(id){const e=db.events.find(x=>x.id===id);dlg(`<h3>Time slot</h3><input id="sl" value="${esc(e.slot)}"><div class="row"><button onclick="close()">Cancel</button><button class="p" onclick="db.events.find(x=>x.id==='${id}').slot=$('sl').value;save();close();render()">Save</button></div>`)}
+function addTo(id){dlg(`<h3>First date for ${MODS[tab]}</h3><input id="fd" type="date" value="${today()}"><div class="row"><button onclick="closeDlg()">Cancel</button><button class="p" onclick="addMod('${id}')">Save</button></div>`)}
+function addMod(id){const p=pp(id),d=$('fd').value;if(!d||!put(p,tab,d))return;p.mods.push(tab);save();closeDlg();render()}
+function editEv(id){const e=db.events.find(x=>x.id===id);dlg(`<h3>New date for ${e.label}</h3><p class="mut">Later events of this type are re-planned from the new date at the normal frequency, 10 years ahead.</p><select id="rs" style="width:100%"><option>Did not attend</option><option>On leave</option><option>Ill</option><option>Other</option></select><br><br><input id="nd" type="date" value="${e.date}"><div class="row"><button onclick="closeDlg()">Cancel</button><button class="p" onclick="if($('nd').value&&reschedule('${id}',$('nd').value,$('rs').value)){closeDlg();render()}">Save</button></div>`)}
+function slotEv(id){const e=db.events.find(x=>x.id===id);dlg(`<h3>Time slot</h3><input id="sl" value="${esc(e.slot)}"><div class="row"><button onclick="closeDlg()">Cancel</button><button class="p" onclick="db.events.find(x=>x.id==='${id}').slot=$('sl').value;save();closeDlg();render()">Save</button></div>`)}
 function pause(id){if(!confirm('Pause? Future events are removed. History and signatures are kept.'))return;const p=pp(id);p.paused=true;db.events=db.events.filter(e=>!(e.pid===id&&!e.done&&e.date>=today()));save();render()}
-function resume(id){dlg(`<h3>Resume from</h3><input id="fd" type="date" value="${today()}"><div class="row"><button onclick="close()">Cancel</button><button class="p" onclick="doResume('${id}')">Resume</button></div>`)}
-function doResume(id){const p=pp(id),d=$('fd').value;if(!d)return;p.paused=false;for(const mo of p.mods)if(!put(p,mo,d)){p.paused=true;return}save();close();render()}
+function resume(id){dlg(`<h3>Resume from</h3><input id="fd" type="date" value="${today()}"><div class="row"><button onclick="closeDlg()">Cancel</button><button class="p" onclick="doResume('${id}')">Resume</button></div>`)}
+function doResume(id){const p=pp(id),d=$('fd').value;if(!d)return;p.paused=false;for(const mo of p.mods)if(!put(p,mo,d)){p.paused=true;return}save();closeDlg();render()}
 function delP(id){if(!confirm('Delete this person AND all their signed records?'))return;db.people=db.people.filter(p=>p.id!==id);db.events=db.events.filter(e=>e.pid!==id);save();go('home')}
 // Signature
-function sign(id){const ev=db.events.find(v=>v.id===id);if(!ev||ev.date!==today())return alert('Sign-off is only possible on the day of the training or injection ('+(ev?nice(ev.date):'')+').');const d=dlg(`<h3>Candidate signs here</h3><canvas id="cv" width="600" height="260"></canvas><div class="row"><button onclick="close()">Cancel</button><button onclick="clr()">Clear</button><button class="g" onclick="saveSig('${id}')">Save</button></div>`);
+function sign(id){const ev=db.events.find(v=>v.id===id);if(!ev||ev.date!==today())return alert('Sign-off is only possible on the day of the training or injection ('+(ev?nice(ev.date):'')+').');const d=dlg(`<h3>Candidate signs here</h3><canvas id="cv" width="600" height="260"></canvas><div class="row"><button onclick="closeDlg()">Cancel</button><button onclick="clr()">Clear</button><button class="g" onclick="saveSig('${id}')">Save</button></div>`);
  const c=$('cv'),x=c.getContext('2d');x.lineWidth=4;x.lineCap='round';window.inked=false;let dn=false;const pt=e=>{const r=c.getBoundingClientRect();return[(e.clientX-r.left)*c.width/r.width,(e.clientY-r.top)*c.height/r.height]};
  c.onpointerdown=e=>{dn=true;const[a,b]=pt(e);x.beginPath();x.moveTo(a,b);c.setPointerCapture(e.pointerId)};c.onpointermove=e=>{if(!dn)return;const[a,b]=pt(e);x.lineTo(a,b);x.stroke();window.inked=true};c.onpointerup=()=>dn=false;window.clr=()=>{x.clearRect(0,0,c.width,c.height);window.inked=false}}
-function saveSig(id){const ev=db.events.find(v=>v.id===id);if(!ev||ev.date!==today()){close();return alert('Sign-off is only possible on the day of the event.')}if(!window.inked)return alert('No signature – the event cannot be marked as completed.');const c=$('cv'),o=document.createElement('canvas');o.width=600;o.height=300;const x=o.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,600,300);x.drawImage(c,0,0);
+function saveSig(id){const ev=db.events.find(v=>v.id===id);if(!ev||ev.date!==today()){closeDlg();return alert('Sign-off is only possible on the day of the event.')}if(!window.inked)return alert('No signature – the event cannot be marked as completed.');const c=$('cv'),o=document.createElement('canvas');o.width=600;o.height=300;const x=o.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,600,300);x.drawImage(c,0,0);
  const ts=new Date(),e=db.events.find(v=>v.id===id);x.fillStyle='#000';x.font='20px sans-serif';x.fillText(pp(e.pid).name+' '+pp(e.pid).surname+' · '+e.label+' · '+ts.toLocaleString('en-GB'),10,285);
- e.done={sig:o.toDataURL('image/png'),ts:ts.toISOString()};save();close();render()}
+ e.done={sig:o.toDataURL('image/png'),ts:ts.toISOString()};save();closeDlg();render()}
 // Messages
 const first=p=>p.name;
 const msgOne=id=>{const e=db.events.find(x=>x.id===id),p=pp(e.pid);return `Hi ${first(p)}, you are scheduled for ${e.label} on ${nice(e.date)}, time slot ${e.slot}. Please confirm.`};
