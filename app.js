@@ -1,4 +1,4 @@
-const APP_VERSION=7,COL={CPR:'#ff6b6b',BLS:'#4dabff',MED:'#c792ff',HEP:'#ffc72c'},DEFREPO='m9r1u5/Training-Scheduler',MODS={CPR:'CPR',BLS:'BLS',MED:'Medicals',HEP:'HEP B'};
+const APP_VERSION=8,COL={CPR:'#ff6b6b',BLS:'#4dabff',MED:'#c792ff',HEP:'#ffc72c'},DEFREPO='m9r1u5/Training-Scheduler',MODS={CPR:'CPR',BLS:'BLS',MED:'Medicals',HEP:'HEP B'};
 
 // Styles shipped inside app.js so "Update" delivers visual fixes without a new APK.
 (()=>{const s=document.createElement('style');s.textContent=`
@@ -6,7 +6,8 @@ html,body{overflow-x:hidden;max-width:100%}main{max-width:100%}
 input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:1;width:32px;height:32px}
 dialog{padding:16px;box-sizing:border-box;max-width:92vw}dialog input,dialog select,dialog textarea{width:100%;max-width:100%}
 .row>*{min-width:0}.cal{grid-template-columns:repeat(7,minmax(0,1fr))}.cal div{min-height:54px;padding:6px 0}
-.dots i{font-style:normal;font-size:16px;line-height:1;margin:0 1px}header button{min-width:0}`;document.head.appendChild(s)})();
+.dots i{font-style:normal;font-size:16px;line-height:1;margin:0 1px}header button{min-width:0}
+body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}input,textarea{-webkit-user-select:text;user-select:text}.cal div[onclick]{cursor:pointer;outline:2px solid #ffffff33}`;document.head.appendChild(s)})();
 const HOL=['2026-01-01','2026-03-21','2026-04-03','2026-04-06','2026-04-27','2026-05-01','2026-06-16','2026-08-10','2026-09-24','2026-12-16','2026-12-25','2026-12-26',
 '2027-01-01','2027-03-22','2027-03-26','2027-03-29','2027-04-27','2027-05-01','2027-06-16','2027-08-09','2027-09-24','2027-12-16','2027-12-25','2027-12-27'];
 const K='sched_db_v1';let db=JSON.parse(localStorage.getItem(K)||'null')||{seq:1,people:[],events:[],holidays:HOL,country:'South Africa (edit list below)',slot:'09:00-10:00',repo:''};
@@ -27,7 +28,7 @@ const nextOf=(p,mod)=>{const e=evs(p.id,mod).find(e=>!e.done&&e.date>=today());r
 const evs=(id,mod)=>db.events.filter(e=>e.pid===id&&(!mod||e.mod===mod)).sort((a,b)=>a.date.localeCompare(b.date));
 function upcoming(){const t=today(),e=C.addDays(t,7);const l=db.events.filter(x=>!x.done&&x.date>=t&&x.date<=e&&!pp(x.pid).paused).sort((a,b)=>a.date.localeCompare(b.date));return l.map(x=>`<div>${nice(x.date)} · ${esc(pp(x.pid).name)} ${esc(pp(x.pid).surname)} · ${x.label}</div>`).join('')||'<div class="mut">Nothing due.</div>'}
 const pp=id=>db.people.find(p=>p.id===id);
-function dlg(html){const d=$('dlg');d.innerHTML=html;d.showModal();return d}
+function dlg(html){const d=$('dlg');if(d.open)d.close();d.innerHTML=html;d.showModal();return d}
 const closeDlg=()=>$('dlg').close();
 function addDlg(){dlg(`<h3>Add to ${MODS[tab]}</h3><input id="fn" placeholder="Name"><br><br><input id="sn" placeholder="Surname"><br><br><label>First date (tap the calendar icon)</label><input id="fd" type="date" value="${today()}"><div class="row"><button onclick="closeDlg()">Cancel</button><button class="p" onclick="addPerson()">Save</button></div>`)}
 function addPerson(){const n=$('fn').value.trim(),s=$('sn').value.trim(),d=$('fd').value;if(!n||!s||!d)return alert('Enter name, surname and a first date.');
@@ -45,7 +46,7 @@ function reschedule(eid,date,why){const e=db.events.find(x=>x.id===eid),p=pp(e.p
  if(!put(p,e.mod,date)){db.events=old;return false}lg();save();return true}
 function person(m){const p=pp(pid),all=evs(p.id);cm=cm||today().slice(0,7);const [y,mo]=cm.split('-').map(Number),first=new Date(y,mo-1,1),off=(first.getDay()+6)%7,dim=new Date(y,mo,0).getDate();
  let cells='MTWTFSS'.split('').map(c=>`<div class="mut">${c}</div>`).join('')+'<div></div>'.repeat(off);
- for(let d=1;d<=dim;d++){const s=cm+'-'+String(d).padStart(2,'0'),e=all.filter(x=>x.date===s);cells+=`<div>${d}<br><span class="dots">${e.map(x=>`<i style="color:${COL[x.mod]}">${x.done?'✔':'●'}</i>`).join('')||'&nbsp;'}</span></div>`}
+ for(let d=1;d<=dim;d++){const s=cm+'-'+String(d).padStart(2,'0'),e=all.filter(x=>x.date===s);cells+=`<div${e.length?` onclick="dayOpen('${s}')"`:''}>${d}<br><span class="dots">${e.map(x=>`<i style="color:${COL[x.mod]}">${x.done?'✔':'●'}</i>`).join('')||'&nbsp;'}</span></div>`}
  const shift=n=>{const d=new Date(y,mo-1+n,1);cm=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');render()};window.shift=shift;
  m.innerHTML=`<h2>${esc(p.name)} ${esc(p.surname)}</h2>${p.paused?'<p class="mut">PAUSED – no reminders or new events.</p>':''}
  <div class="row"><button onclick="shift(-1)">◀</button><b style="text-align:center;padding-top:12px">${first.toLocaleDateString('en-GB',{month:'long',year:'numeric'})}</b><button onclick="shift(1)">▶</button></div><div class="cal">${cells}</div>
@@ -53,6 +54,8 @@ function person(m){const p=pp(pid),all=evs(p.id);cm=cm||today().slice(0,7);const
  +`<div class="row"><button class="p" onclick="share(msgYear('${p.id}'))">Year ahead message</button></div>`+((db.log||[]).filter(l=>l.pid===p.id).length?'<div class="card"><b>Reschedule history</b>'+db.log.filter(l=>l.pid===p.id).map(l=>`<div class="mut">${l.label}: ${nice(l.from)} → ${nice(l.to)} (${esc(l.why)})</div>`).join('')+'</div>':'')
  +Object.entries(MODS).filter(([k])=>!p.mods.includes(k)).map(([k,v])=>`<button class="item" onclick="tab='${k}';addTo('${p.id}')">+ Put on ${v}</button>`).join('')
  +`<div class="row">${p.paused?`<button class="g" onclick="resume('${p.id}')">Resume</button>`:`<button class="r" onclick="pause('${p.id}')">Pause</button>`}<button class="r" onclick="delP('${p.id}')">Delete</button></div>`}
+function dayOpen(s){const p=pp(pid),l=evs(p.id).filter(e=>e.date===s);if(!l.length)return;
+ dlg(`<h3>${esc(p.name)} ${esc(p.surname)}</h3><div class="mut">${nice(s)}</div>`+l.map(e=>`<div class="card" style="border-left:10px solid ${COL[e.mod]}"><b>${e.label}</b> · ${MODS[e.mod]}<br>Slot: ${esc(e.slot)}<br>${e.done?'<span style="color:var(--ok)">✔ Completed '+new Date(e.done.ts).toLocaleString('en-GB')+'</span>':'Status: scheduled'}${e.done?'':`<div class="row"><button onclick="editEv('${e.id}')">Missed / reschedule</button><button class="g" ${e.date===today()?'':'disabled style="opacity:.35"'} onclick="sign('${e.id}')">Sign off</button></div>`}<div class="row"><button onclick="slotEv('${e.id}')">Time slot</button><button onclick="share(msgOne('${e.id}'))">Message</button></div></div>`).join('')+`<button class="item p" onclick="closeDlg()">Close</button>`)}
 function addTo(id){dlg(`<h3>First date for ${MODS[tab]}</h3><input id="fd" type="date" value="${today()}"><div class="row"><button onclick="closeDlg()">Cancel</button><button class="p" onclick="addMod('${id}')">Save</button></div>`)}
 function addMod(id){const p=pp(id),d=$('fd').value;if(!d||!put(p,tab,d))return;p.mods.push(tab);save();closeDlg();render()}
 function editEv(id){const e=db.events.find(x=>x.id===id);dlg(`<h3>New date for ${e.label}</h3><p class="mut">Later events of this type are re-planned from the new date at the normal frequency, 10 years ahead.</p><select id="rs" style="width:100%"><option>Did not attend</option><option>On leave</option><option>Ill</option><option>Other</option></select><br><br><input id="nd" type="date" value="${e.date}"><div class="row"><button onclick="closeDlg()">Cancel</button><button class="p" onclick="if($('nd').value&&reschedule('${id}',$('nd').value,$('rs').value)){closeDlg();render()}">Save</button></div>`)}
