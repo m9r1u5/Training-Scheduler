@@ -1,4 +1,4 @@
-const APP_VERSION=10,COL={CPR:'#ff6b6b',BLS:'#4dabff',MED:'#c792ff',HEP:'#ffc72c'},DEFREPO='m9r1u5/Training-Scheduler',MODS={CPR:'CPR',BLS:'BLS',MED:'Medicals',HEP:'HEP B'};
+const APP_VERSION=11,COL={CPR:'#ff6b6b',BLS:'#4dabff',MED:'#c792ff',HEP:'#ffc72c'},DEFREPO='m9r1u5/Training-Scheduler',MODS={CPR:'CPR',BLS:'BLS',MED:'Medicals',HEP:'HEP B'};
 
 // Styles shipped inside app.js so "Update" delivers visual fixes without a new APK.
 (()=>{const s=document.createElement('style');s.textContent=`
@@ -91,6 +91,15 @@ function calExport(id){const z=n=>String(n).padStart(2,'0'),esc2=t=>String(t).re
   L.push('BEGIN:VEVENT','UID:'+e.id+'@training-scheduler','DTSTAMP:'+stamp,'DTSTART:'+dt(e.date,a),'DTEND:'+dt(e.date,b),'SUMMARY:'+esc2(e.label+' - '+p.name+' '+p.surname),'DESCRIPTION:'+esc2('Time slot '+e.slot),'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:'+esc2('Tomorrow: '+e.label+' - '+p.name+' '+p.surname),'TRIGGER:-PT'+mins+'M','END:VALARM','END:VEVENT');n++}
  L.push('END:VCALENDAR');if(!n)return alert('Nothing to add: no upcoming events.');
  saveFile('training-schedule.ics',L.join('\r\n'),'text/calendar').then(()=>alert(n+' events saved. Tap the "Download complete" notification (or open the file) and choose Calendar > Add. Your Calendar app will remind you at 09:00 on the working day before each event.')).catch(e=>alert('Could not save: '+e))}
+// CSV exports (open in Excel / Google Sheets). Year ahead = today until 12 months from today.
+function exportPlan(id){const t=today(),end=C.addMonths(t,12),q=s=>'"'+String(s).replace(/"/g,'""')+'"';
+ const l=db.events.filter(e=>(!id||e.pid===id)&&e.date>=t&&e.date<=end&&pp(e.pid)).sort((a,b)=>a.date.localeCompare(b.date)||pp(a.pid).surname.localeCompare(pp(b.pid).surname));
+ if(!l.length)return alert('Nothing scheduled in the next 12 months.');
+ const rows=[['Date','Day','Name','Surname','Module','Event','Time slot','Status']].concat(l.map(e=>{const p=pp(e.pid);return [e.date,C.parse(e.date).toLocaleDateString('en-GB',{weekday:'long'}),p.name,p.surname,MODS[e.mod],e.label,e.slot,e.done?'Completed':'Scheduled']}));
+ const p=id&&pp(id),name=id?'year-ahead-'+(p.name+'-'+p.surname).replace(/[^A-Za-z0-9]+/g,'-'):'year-planner-'+t;
+ saveFile(name+'.csv','\ufeff'+rows.map(r=>r.map(q).join(',')).join('\r\n'),'text/csv').then(()=>alert(l.length+' events exported. Open the downloaded file with Excel or Google Sheets, or share it.')).catch(e=>alert('Could not save: '+e))}
+function exportPersonDlg(){if(!db.people.length)return alert('No people yet.');
+ dlg(`<h3>Export year ahead for</h3><select id="xp" style="width:100%">${db.people.slice().sort((a,b)=>a.surname.localeCompare(b.surname)).map(p=>`<option value="${p.id}">${esc(p.name)} ${esc(p.surname)}</option>`).join('')}</select><div class="row"><button onclick="closeDlg()">Cancel</button><button class="p" onclick="const i=$('xp').value;closeDlg();exportPlan(i)">Export</button></div>`)}
 async function testReminder(){const L=LN();if(!L){try{if(await Notification.requestPermission()!=='granted')return alert('Allow notifications for this site first.');const reg=await navigator.serviceWorker.ready,p=db.people[0];
   await reg.showNotification('Tomorrow: CPR (TEST)',{body:(p?p.name+' '+p.surname:'Sample Person')+' · '+nice(C.addDays(today(),1))+' · '+db.slot,actions:[{action:'accept',title:'Accept'},{action:'snooze',title:'Snooze 2h'}],requireInteraction:true});
   alert('This is how a reminder looks. In the web version it can only appear while the app is open. For reminders that always fire, use "Add reminders to phone calendar".')}catch(e){alert('Could not show a notification: '+e.message)}return}
@@ -106,7 +115,7 @@ async function perms(){const L=LN();if(!L)return alert('Notifications only work 
 function settings(m){m.innerHTML=`<h2>Settings</h2><div class="card"><b>Default time slot</b><input id="s1" value="${esc(db.slot)}" onchange="db.slot=this.value;save()"></div>
 <div class="card"><b>Country / public holidays</b> (one date per line, YYYY-MM-DD)<input id="s0" value="${esc(db.country)}" onchange="db.country=this.value;save()"><br><br><textarea id="s2" rows="8" style="width:100%" onchange="hol(this.value)">${db.holidays.join('\n')}</textarea><p class="mut">Changing holidays does not move existing events; change a date to re-plan.</p></div>
 <div class="card"><b>GitHub repo for updates</b> (owner/name)<input id="s3" value="${esc(db.repo||DEFREPO)}" onchange="db.repo=this.value;save()"></div>
-<button class="item p" onclick="perms()">Allow notifications and exact alarms</button><button class="item g" onclick="testReminder()">Send test reminder (in 1 minute)</button><button class="item p" onclick="calExport()">Add reminders to phone calendar (everyone)</button><button class="item" onclick="backup()">Back up all data</button>
+<button class="item p" onclick="perms()">Allow notifications and exact alarms</button><button class="item g" onclick="testReminder()">Send test reminder (in 1 minute)</button><button class="item p" onclick="calExport()">Add reminders to phone calendar (everyone)</button><button class="item" onclick="exportPlan()">Export full year planner (everyone)</button><button class="item" onclick="exportPersonDlg()">Export a person's year ahead</button><button class="item" onclick="backup()">Back up all data</button>
 <label class="item"><button class="item" onclick="$('rf').click()">Restore from backup</button></label><input id="rf" type="file" accept=".json,application/json" hidden onchange="restore(this.files[0])">
 <p class="mut">If reminders are late: Settings › Apps › Training Scheduler › Battery › Unrestricted.</p>`}
 function hol(v){db.holidays=v.split(/\s+/).filter(s=>/^\d{4}-\d\d-\d\d$/.test(s)).sort();save()}
