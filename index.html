@@ -1,0 +1,33 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="manifest" href="manifest.json"><meta name="theme-color" content="#0b1620"><title>Training Scheduler</title>
+<style>
+:root{--bg:#0b1620;--card:#16283a;--ink:#fff;--mut:#9fb3c8;--acc:#ffc72c;--ok:#3ad1b5;--bad:#ff6b6b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:18px/1.35 system-ui,sans-serif;padding-bottom:84px}
+header{position:sticky;top:0;background:#000;padding:8px;display:flex;gap:6px;flex-wrap:wrap;z-index:5}
+button,input,select,textarea{font:inherit;border-radius:12px;border:2px solid var(--mut);background:var(--card);color:var(--ink);padding:14px;min-height:52px}
+button{font-weight:700;cursor:pointer}button.p{background:var(--acc);color:#000;border-color:var(--acc)}button.g{background:var(--ok);color:#000;border-color:var(--ok)}button.r{border-color:var(--bad);color:var(--bad)}
+header button{flex:1;padding:10px 4px;min-height:48px}
+main{padding:12px}.row{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap}.row>*{flex:1}
+.item{width:100%;text-align:left;margin:6px 0;display:block}.card{background:var(--card);border-radius:14px;padding:12px;margin:10px 0}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#000;padding:6px;gap:6px}nav button{flex:1;padding:8px 2px}nav button.on{background:var(--acc);color:#000;border-color:var(--acc)}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center}.cal div{padding:10px 0;border-radius:8px;background:#0f1f2e}
+.cal .e{background:var(--acc);color:#000;font-weight:800}.cal .d{background:var(--ok);color:#000;font-weight:800}.mut{color:var(--mut)}
+dialog{background:var(--card);color:var(--ink);border:3px solid var(--acc);border-radius:16px;width:92%}dialog::backdrop{background:#000a}
+input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:1;width:30px;height:30px;cursor:pointer}
+.dots i{font-style:normal;font-size:15px;line-height:1;margin:0 1px}.cal div{min-height:52px}
+canvas{background:#fff;border-radius:12px;width:100%;touch-action:none}input[type=date],input[type=time]{width:100%}
+</style></head><body>
+<header><button onclick="go('home')">Home</button><button id="ib" onclick="doInstall()">Install</button><button onclick="doUpdate()">Update</button><button onclick="shareApp()">Share</button><button onclick="go('set')">Settings</button></header>
+<main id="m"></main>
+<nav id="nav"></nav><dialog id="dlg"></dialog>
+<script>
+(async()=>{const ver=t=>+((t.match(/APP_VERSION\s*=\s*(\d+)/)||[])[1]||0),get=async f=>(await fetch(f,{cache:'no-store'})).text();
+ let files={};try{files={'core.js':await get('core.js'),'app.js':await get('app.js')}}catch(e){}
+ let up=null;try{up=JSON.parse(localStorage.getItem('upd')||'null')}catch(e){}
+ const useUp=up&&up.files&&up.v>ver(files['app.js']||'')&&!sessionStorage.getItem('updfail');if(useUp)files=up.files;
+ let bad=false;onerror=()=>{bad=true};
+ for(const f of['core.js','app.js']){const s=document.createElement('script');s.textContent=files[f]||'';document.body.appendChild(s)}
+ if(bad&&useUp){localStorage.removeItem('upd');sessionStorage.setItem('updfail','1');location.reload()}
+ else if(bad)document.getElementById('m').textContent='App failed to start. Reinstall the APK.'})();
+</script></body></html>
