@@ -1,4 +1,4 @@
-const APP_VERSION=8,COL={CPR:'#ff6b6b',BLS:'#4dabff',MED:'#c792ff',HEP:'#ffc72c'},DEFREPO='m9r1u5/Training-Scheduler',MODS={CPR:'CPR',BLS:'BLS',MED:'Medicals',HEP:'HEP B'};
+const APP_VERSION=9,COL={CPR:'#ff6b6b',BLS:'#4dabff',MED:'#c792ff',HEP:'#ffc72c'},DEFREPO='m9r1u5/Training-Scheduler',MODS={CPR:'CPR',BLS:'BLS',MED:'Medicals',HEP:'HEP B'};
 
 // Styles shipped inside app.js so "Update" delivers visual fixes without a new APK.
 (()=>{const s=document.createElement('style');s.textContent=`
@@ -82,6 +82,11 @@ async function sync(){const L=LN();if(!L)return;try{await L.registerActionTypes(
  const now=Date.now(),list=[];for(const e of db.events){const p=pp(e.pid);if(e.done||!p||p.paused)continue;const r=C.reminderDay(e.date,db.holidays),at=new Date(r+'T09:00:00');if(at<=now)continue;
   list.push({id:Number(e.id.slice(1)),title:'Tomorrow: '+e.label,body:`${p.name} ${p.surname} · ${nice(e.date)} · ${e.slot}`,schedule:{at,allowWhileIdle:true},actionTypeId:'REMIND',extra:{}});}
  list.sort((a,b)=>a.schedule.at-b.schedule.at);if(list.length)await L.schedule({notifications:list.slice(0,400)})}catch(e){console.log(e)}}
+async function testReminder(){const L=LN();if(!L)return alert('Test reminders only work in the installed APK, not the web version.');
+ try{const r=await L.requestPermissions();if(r.display!=='granted')return alert('Notifications are not allowed. Tap "Allow notifications and exact alarms" first.');
+  await L.registerActionTypes({types:[{id:'REMIND',actions:[{id:'accept',title:'Accept'},{id:'snooze',title:'Snooze 2h'}]}]});
+  const p=db.people[0];await L.schedule({notifications:[{id:2000000000,title:'Tomorrow: CPR (TEST)',body:(p?p.name+' '+p.surname:'Sample Person')+' · '+nice(C.addDays(today(),1))+' · '+db.slot,schedule:{at:new Date(Date.now()+60000),allowWhileIdle:true},actionTypeId:'REMIND'}]});
+  alert('Test reminder set for 1 minute from now. Lock the phone or close the app, then wait.')}catch(e){alert('Could not schedule: '+e.message)}}
 async function perms(){const L=LN();if(!L)return alert('Notifications only work in the installed Android app.');const r=await L.requestPermissions();let ex='n/a';try{ex=(await L.checkExactNotificationSetting()).exact_alarm}catch(e){}
  if(ex!=='granted'&&confirm('Exact alarms are off. Open the setting? Turn on "Alarms & reminders" for this app.'))await L.changeExactNotificationSetting();
  alert('Notifications: '+r.display+'\nExact alarms: '+ex);sync()}
@@ -90,7 +95,7 @@ async function perms(){const L=LN();if(!L)return alert('Notifications only work 
 function settings(m){m.innerHTML=`<h2>Settings</h2><div class="card"><b>Default time slot</b><input id="s1" value="${esc(db.slot)}" onchange="db.slot=this.value;save()"></div>
 <div class="card"><b>Country / public holidays</b> (one date per line, YYYY-MM-DD)<input id="s0" value="${esc(db.country)}" onchange="db.country=this.value;save()"><br><br><textarea id="s2" rows="8" style="width:100%" onchange="hol(this.value)">${db.holidays.join('\n')}</textarea><p class="mut">Changing holidays does not move existing events; change a date to re-plan.</p></div>
 <div class="card"><b>GitHub repo for updates</b> (owner/name)<input id="s3" value="${esc(db.repo||DEFREPO)}" onchange="db.repo=this.value;save()"></div>
-<button class="item p" onclick="perms()">Allow notifications and exact alarms</button><button class="item" onclick="backup()">Back up all data</button>
+<button class="item p" onclick="perms()">Allow notifications and exact alarms</button><button class="item g" onclick="testReminder()">Send test reminder (in 1 minute)</button><button class="item" onclick="backup()">Back up all data</button>
 <label class="item"><button class="item" onclick="$('rf').click()">Restore from backup</button></label><input id="rf" type="file" accept=".json,application/json" hidden onchange="restore(this.files[0])">
 <p class="mut">If reminders are late: Settings › Apps › Training Scheduler › Battery › Unrestricted.</p>`}
 function hol(v){db.holidays=v.split(/\s+/).filter(s=>/^\d{4}-\d\d-\d\d$/.test(s)).sort();save()}
