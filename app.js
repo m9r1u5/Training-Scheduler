@@ -1,4 +1,4 @@
-const APP_VERSION=11,COL={CPR:'#ff6b6b',BLS:'#4dabff',MED:'#c792ff',HEP:'#ffc72c'},DEFREPO='m9r1u5/Training-Scheduler',MODS={CPR:'CPR',BLS:'BLS',MED:'Medicals',HEP:'HEP B'};
+const APP_VERSION=12,COL={CPR:'#ff6b6b',BLS:'#4dabff',MED:'#c792ff',HEP:'#ffc72c'},DEFREPO='m9r1u5/Training-Scheduler',MODS={CPR:'CPR',BLS:'BLS',MED:'Medicals',HEP:'HEP B'};
 
 // Styles shipped inside app.js so "Update" delivers visual fixes without a new APK.
 (()=>{const s=document.createElement('style');s.textContent=`
@@ -11,7 +11,7 @@ body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webki
 const HOL=['2026-01-01','2026-03-21','2026-04-03','2026-04-06','2026-04-27','2026-05-01','2026-06-16','2026-08-10','2026-09-24','2026-12-16','2026-12-25','2026-12-26',
 '2027-01-01','2027-03-22','2027-03-26','2027-03-29','2027-04-27','2027-05-01','2027-06-16','2027-08-09','2027-09-24','2027-12-16','2027-12-25','2027-12-27'];
 const K='sched_db_v1';let db=JSON.parse(localStorage.getItem(K)||'null')||{seq:1,people:[],events:[],holidays:HOL,country:'South Africa (edit list below)',slot:'09:00-10:00',repo:''};
-const save=()=>{localStorage.setItem(K,JSON.stringify(db));sync()};
+const persist=()=>{localStorage.setItem(K,JSON.stringify(db));sync()},save=()=>{stamp();persist();syncSoon()};
 const $=id=>document.getElementById(id),C=Core,LN=()=>window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.LocalNotifications;
 const nice=s=>C.parse(s).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
 const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -20,7 +20,7 @@ function go(v,a){view=v;if(MODS[v]){tab=v;view='list'}if(a)pid=a;render()}
 function render(){
  $('nav').innerHTML=Object.entries(MODS).map(([k,v])=>`<button class="${tab===k&&view==='list'?'on':''}" onclick="go('${k}')">${v}</button>`).join('');
  const m=$('m');
- if(view==='home')m.innerHTML=`<h2>Training Scheduler</h2><p class="mut">Version ${APP_VERSION} · pick a tab below.</p>`+Object.entries(MODS).map(([k,v])=>{const n=db.people.filter(p=>p.mods.includes(k)).length;return `<button class="item p" onclick="go('${k}')">${v} · ${n} people</button>`}).join('')+`<div class="card"><b>Next 7 days</b>${upcoming()}</div>`;
+ if(view==='home')m.innerHTML=`<h2>Training Scheduler</h2><p class="mut">Version ${APP_VERSION} · pick a tab below.<br><span id="sst">${esc(syncStatus())}</span></p>`+Object.entries(MODS).map(([k,v])=>{const n=db.people.filter(p=>p.mods.includes(k)).length;return `<button class="item p" onclick="go('${k}')">${v} · ${n} people</button>`}).join('')+`<div class="card"><b>Next 7 days</b>${upcoming()}</div>`;
  if(view==='list'){const ps=db.people.filter(p=>p.mods.includes(tab));m.innerHTML=`<h2>${MODS[tab]}</h2>`+(ps.map(p=>`<button class="item" onclick="go('person','${p.id}')">${esc(p.name)} ${esc(p.surname)}${p.paused?' (paused)':''}<br><span class="mut">${nextOf(p,tab)}</span></button>`).join('')||'<p class="mut">Nobody yet.</p>')+`<button class="item p" onclick="addDlg()">+ Add person</button>`}
  if(view==='person')person(m);if(view==='set')settings(m);
 }
@@ -33,11 +33,11 @@ const closeDlg=()=>$('dlg').close();
 function addDlg(){dlg(`<h3>Add to ${MODS[tab]}</h3><input id="fn" placeholder="Name"><br><br><input id="sn" placeholder="Surname"><br><br><label>First date (tap the calendar icon)</label><input id="fd" type="date" value="${today()}"><div class="row"><button onclick="closeDlg()">Cancel</button><button class="p" onclick="addPerson()">Save</button></div>`)}
 function addPerson(){const n=$('fn').value.trim(),s=$('sn').value.trim(),d=$('fd').value;if(!n||!s||!d)return alert('Enter name, surname and a first date.');
  let p=db.people.find(x=>x.name.toLowerCase()===n.toLowerCase()&&x.surname.toLowerCase()===s.toLowerCase());const isNew=!p;
- if(isNew)p={id:'p'+db.seq++,name:n,surname:s,mods:[],paused:false};
+ if(isNew)p={id:'p'+uid(),name:n,surname:s,mods:[],paused:false};
  if(p.mods.includes(tab))return alert('Already on '+MODS[tab]+'.');
  if(!put(p,tab,d,false))return;if(isNew)db.people.push(p);p.mods.push(tab);save();closeDlg();view='list';render()}
 // Create events for one module from an anchor date; blocks (returns false) on a CPR/BLS clash.
-function put(p,mod,anchor,keepFrom,list=db.events){const g=C.generate(mod,anchor,db.holidays).map(e=>({id:'e'+db.seq++,pid:p.id,mod,date:e.date,label:e.label,slot:db.slot,done:null}));
+function put(p,mod,anchor,keepFrom,list=db.events){const g=C.generate(mod,anchor,db.holidays).map(e=>({id:'e'+uid(),pid:p.id,mod,date:e.date,label:e.label,slot:db.slot,done:null}));
  const base=list.filter(e=>e.pid===p.id);if(g.some(a=>base.some(b=>C.clash(a,b)))){alert('Conflict: already scheduled for something else');return false}
  db.events.push(...g);return true}
 function reschedule(eid,date,why){const e=db.events.find(x=>x.id===eid),p=pp(e.pid),from=e.date,lbl=e.label,old=db.events.slice();const lg=()=>{(db.log=db.log||[]).push({pid:p.id,label:lbl,from,to:date,why:why||'',ts:new Date().toISOString()})};
@@ -80,7 +80,7 @@ async function share(text){const S=window.Capacitor&&Capacitor.Plugins.Share;try
 async function sync(){const L=LN();if(!L)return;try{await L.registerActionTypes({types:[{id:'REMIND',actions:[{id:'accept',title:'Accept'},{id:'snooze',title:'Snooze 2h'}]}]});
  const pend=await L.getPending();if(pend.notifications.length)await L.cancel({notifications:pend.notifications.filter(n=>n.id<1e9).map(n=>({id:n.id}))});
  const now=Date.now(),list=[];for(const e of db.events){const p=pp(e.pid);if(e.done||!p||p.paused)continue;const r=C.reminderDay(e.date,db.holidays),at=new Date(r+'T09:00:00');if(at<=now)continue;
-  list.push({id:Number(e.id.slice(1)),title:'Tomorrow: '+e.label,body:`${p.name} ${p.surname} · ${nice(e.date)} · ${e.slot}`,schedule:{at,allowWhileIdle:true},actionTypeId:'REMIND',extra:{}});}
+  list.push({id:hash32(e.id)%1e9,title:'Tomorrow: '+e.label,body:`${p.name} ${p.surname} · ${nice(e.date)} · ${e.slot}`,schedule:{at,allowWhileIdle:true},actionTypeId:'REMIND',extra:{}});}
  list.sort((a,b)=>a.schedule.at-b.schedule.at);if(list.length)await L.schedule({notifications:list.slice(0,400)})}catch(e){console.log(e)}}
 // Calendar file (.ics): the phone's own Calendar app then fires the reminder (09:00 on the working day before), even when this app is closed.
 async function saveFile(name,text,type){const P=window.Capacitor&&Capacitor.Plugins;if(P&&P.Filesystem&&P.Share){const r=await P.Filesystem.writeFile({path:name,data:text,directory:'CACHE',encoding:'utf8'});await P.Share.share({title:name,files:[r.uri]})}else{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;document.body.appendChild(a);a.click();a.remove()}}
@@ -91,6 +91,48 @@ function calExport(id){const z=n=>String(n).padStart(2,'0'),esc2=t=>String(t).re
   L.push('BEGIN:VEVENT','UID:'+e.id+'@training-scheduler','DTSTAMP:'+stamp,'DTSTART:'+dt(e.date,a),'DTEND:'+dt(e.date,b),'SUMMARY:'+esc2(e.label+' - '+p.name+' '+p.surname),'DESCRIPTION:'+esc2('Time slot '+e.slot),'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:'+esc2('Tomorrow: '+e.label+' - '+p.name+' '+p.surname),'TRIGGER:-PT'+mins+'M','END:VALARM','END:VEVENT');n++}
  L.push('END:VCALENDAR');if(!n)return alert('Nothing to add: no upcoming events.');
  saveFile('training-schedule.ics',L.join('\r\n'),'text/calendar').then(()=>alert(n+' events saved. Tap the "Download complete" notification (or open the file) and choose Calendar > Add. Your Calendar app will remind you at 09:00 on the working day before each event.')).catch(e=>alert('Could not save: '+e))}
+// ===== Sync between devices through a PRIVATE GitHub repo (data.json). Per-record merge: the newest change wins. =====
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+function hash32(s){let x=2166136261;for(let i=0;i<s.length;i++){x^=s.charCodeAt(i);x=Math.imul(x,16777619)}return x>>>0}
+const recHash=r=>{const o=Object.assign({},r);delete o.u;return hash32(JSON.stringify(o))};
+const scfg=()=>{try{return JSON.parse(localStorage.getItem('sync_cfg')||'{}')}catch(e){return {}}},setScfg=o=>{localStorage.setItem('sync_cfg',JSON.stringify(Object.assign(scfg(),o)));setSM()};
+let syncMsg='',syncBusy=false,syncTimer=null;
+function syncStatus(){const c=scfg();if(!c.repo||!c.token)return 'Sync is off';return syncMsg||(c.last?'Last sync: '+new Date(c.last).toLocaleString('en-GB'):'Not synced yet')}
+function setSM(m){if(m!==undefined)syncMsg=m;const el=document.getElementById('sst');if(el)el.textContent=syncStatus()}
+// Give every changed record a new timestamp; record deletions as tombstones.
+function stamp(){const now=Date.now(),sn=db.snap=db.snap||{},seen={};
+ for(const [t,arr] of [['p',db.people],['e',db.events]])for(const r of arr){const k=t+r.id;seen[k]=1;const x=recHash(r);if(sn[k]!==x){r.u=now;sn[k]=x}else if(!r.u)r.u=now}
+ const sv=hash32(JSON.stringify([db.slot,db.holidays,db.country]));seen.s=1;if(sn.s!==sv){db.su=now;sn.s=sv}
+ db.del=db.del||[];for(const k in sn)if(!seen[k]){db.del.push({k,u:now});delete sn[k]}
+ db.del=db.del.filter(d=>now-d.u<15552e6)}
+const localDoc=()=>({v:1,people:db.people,events:db.events,holidays:db.holidays,country:db.country,slot:db.slot,su:db.su||0,del:db.del||[],log:db.log||[]});
+function canon(d){const s=(a,f)=>(a||[]).slice().sort((x,y)=>String(f(x)).localeCompare(String(f(y))));return JSON.stringify([s(d.people,r=>r.id),s(d.events,r=>r.id),d.holidays,d.country,d.slot,d.su||0,s(d.del,r=>r.k),s(d.log,r=>r.pid+r.ts+r.label)])}
+function mergeDocs(A,B){const tomb={};for(const d of[...(A.del||[]),...(B.del||[])])if(!(tomb[d.k]>=d.u))tomb[d.k]=d.u;
+ const pick=(t,a,b)=>{const m=new Map();for(const r of[...(a||[]),...(b||[])]){const o=m.get(r.id);if(!o||(r.u||0)>(o.u||0))m.set(r.id,r)}return[...m.values()].filter(r=>!(tomb[t+r.id]>=(r.u||0)))};
+ const people=pick('p',A.people,B.people),ids=new Set(people.map(p=>p.id)),events=pick('e',A.events,B.events).filter(e=>ids.has(e.pid));
+ const S=(B.su||0)>(A.su||0)?B:A,lg=new Map();for(const l of[...(A.log||[]),...(B.log||[])])lg.set(l.pid+'|'+l.ts+'|'+l.label,l);
+ return{v:1,people,events,holidays:S.holidays,country:S.country,slot:S.slot,su:Math.max(A.su||0,B.su||0),del:Object.entries(tomb).map(([k,u])=>({k,u})),log:[...lg.values()]}}
+function applyDoc(M){db.people=M.people||[];db.events=M.events||[];db.holidays=M.holidays||db.holidays;db.country=M.country||db.country;db.slot=M.slot||db.slot;db.su=M.su||0;db.del=M.del||[];db.log=M.log||[];
+ db.snap={s:hash32(JSON.stringify([db.slot,db.holidays,db.country]))};for(const r of db.people)db.snap['p'+r.id]=recHash(r);for(const r of db.events)db.snap['e'+r.id]=recHash(r);
+ persist();if(!$('dlg').open)render()}
+function b64e(s){const b=new TextEncoder().encode(s);let o='';for(let i=0;i<b.length;i+=0x8000)o+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000));return btoa(o)}
+function b64d(s){const o=atob(s.replace(/\s/g,'')),b=new Uint8Array(o.length);for(let i=0;i<o.length;i++)b[i]=o.charCodeAt(i);return new TextDecoder().decode(b)}
+async function ghFile(o={}){const c=scfg();return fetch('https://api.github.com/repos/'+c.repo+'/contents/data.json',{method:o.method||'GET',cache:'no-store',headers:{Authorization:'Bearer '+c.token,Accept:o.raw?'application/vnd.github.raw+json':'application/vnd.github+json'},body:o.body})}
+async function getRemote(){const r=await ghFile();if(r.status===404)return{doc:null,sha:null};if(r.status===401||r.status===403)throw new Error('GitHub refused the token ('+r.status+')');if(!r.ok)throw new Error('GitHub error '+r.status);
+ const j=await r.json();let t;if(j.encoding==='base64'&&j.content)t=b64d(j.content);else{const r2=await ghFile({raw:1});if(!r2.ok)throw new Error('GitHub error '+r2.status);t=await r2.text()}return{doc:JSON.parse(t),sha:j.sha}}
+function choose(){return new Promise(res=>{window._c=v=>{res(v);closeDlg()};dlg(`<h3>The cloud already has data</h3><p>Which copy should this device use?</p><button class="item p" onclick="_c('cloud')">Use the cloud data (replaces this device)</button><button class="item" onclick="_c('local')">Keep this device's data (replaces the cloud)</button><button class="item" onclick="_c('merge')">Merge both (only if both came from the same backup)</button><button class="item r" onclick="_c(null)">Cancel</button>`);$('dlg').addEventListener('close',()=>res(null),{once:true})})}
+async function syncNow(manual){const c=scfg();if(!c.repo||!c.token){if(manual)alert('Enter the sync repo and token in Settings first.');return}
+ if(syncBusy)return;syncBusy=true;setSM('Syncing…');let choice=null;
+ try{for(let n=0;n<3;n++){stamp();const{doc,sha}=await getRemote(),L=localDoc();let M=L;
+   if(doc){if(!choice&&!scfg().last&&L.people.length&&(doc.people||[]).length){choice=await choose();if(!choice){setSM('Sync cancelled');return}}
+    M=choice==='cloud'?doc:choice==='local'?L:mergeDocs(L,doc)}
+   if(canon(M)!==canon(L))applyDoc(M);
+   if(!doc||canon(M)!==canon(doc)){const r=await ghFile({method:'PUT',body:JSON.stringify({message:'sync',content:b64e(JSON.stringify(Object.assign({saved:Date.now()},M))),sha:sha||undefined})});
+    if(r.status===409||r.status===422)continue;if(!r.ok)throw new Error(r.status===404?'Repo not found, or the token has no access to it':'GitHub error '+r.status)}
+   setScfg({last:Date.now()});setSM('');return}
+  throw new Error('The cloud copy kept changing, try again')}
+ catch(e){setSM('Sync failed: '+e.message);if(manual)alert('Sync failed: '+e.message)}finally{syncBusy=false;setSM()}}
+const syncSoon=(ms=4000)=>{clearTimeout(syncTimer);syncTimer=setTimeout(()=>syncNow(false),ms)};
 // CSV exports (open in Excel / Google Sheets). Year ahead = today until 12 months from today.
 function exportPlan(id){const t=today(),end=C.addMonths(t,12),q=s=>'"'+String(s).replace(/"/g,'""')+'"';
  const l=db.events.filter(e=>(!id||e.pid===id)&&e.date>=t&&e.date<=end&&pp(e.pid)).sort((a,b)=>a.date.localeCompare(b.date)||pp(a.pid).surname.localeCompare(pp(b.pid).surname));
@@ -115,7 +157,7 @@ async function perms(){const L=LN();if(!L)return alert('Notifications only work 
 function settings(m){m.innerHTML=`<h2>Settings</h2><div class="card"><b>Default time slot</b><input id="s1" value="${esc(db.slot)}" onchange="db.slot=this.value;save()"></div>
 <div class="card"><b>Country / public holidays</b> (one date per line, YYYY-MM-DD)<input id="s0" value="${esc(db.country)}" onchange="db.country=this.value;save()"><br><br><textarea id="s2" rows="8" style="width:100%" onchange="hol(this.value)">${db.holidays.join('\n')}</textarea><p class="mut">Changing holidays does not move existing events; change a date to re-plan.</p></div>
 <div class="card"><b>GitHub repo for updates</b> (owner/name)<input id="s3" value="${esc(db.repo||DEFREPO)}" onchange="db.repo=this.value;save()"></div>
-<button class="item p" onclick="perms()">Allow notifications and exact alarms</button><button class="item g" onclick="testReminder()">Send test reminder (in 1 minute)</button><button class="item p" onclick="calExport()">Add reminders to phone calendar (everyone)</button><button class="item" onclick="exportPlan()">Export full year planner (everyone)</button><button class="item" onclick="exportPersonDlg()">Export a person's year ahead</button><button class="item" onclick="backup()">Back up all data</button>
+<div class="card"><b>Sync between devices</b><p class="mut">Uses a PRIVATE GitHub repo that you create. Use the same repo and token on every device.</p><input placeholder="owner/private-repo" value="${esc(scfg().repo||'')}" onchange="setScfg({repo:this.value.trim()})"><br><br><input type="password" placeholder="Access token" value="${esc(scfg().token||'')}" onchange="setScfg({token:this.value.trim()})"><p id="sst" class="mut">${esc(syncStatus())}</p><div class="row"><button class="g" onclick="syncNow(true)">Sync now</button><button class="r" onclick="setScfg({repo:'',token:'',last:0});render()">Disconnect</button></div></div><button class="item p" onclick="perms()">Allow notifications and exact alarms</button><button class="item g" onclick="testReminder()">Send test reminder (in 1 minute)</button><button class="item p" onclick="calExport()">Add reminders to phone calendar (everyone)</button><button class="item" onclick="exportPlan()">Export full year planner (everyone)</button><button class="item" onclick="exportPersonDlg()">Export a person's year ahead</button><button class="item" onclick="backup()">Back up all data</button>
 <label class="item"><button class="item" onclick="$('rf').click()">Restore from backup</button></label><input id="rf" type="file" accept=".json,application/json" hidden onchange="restore(this.files[0])">
 <p class="mut">If reminders are late: Settings › Apps › Training Scheduler › Battery › Unrestricted.</p>`}
 function hol(v){db.holidays=v.split(/\s+/).filter(s=>/^\d{4}-\d\d-\d\d$/.test(s)).sort();save()}
@@ -136,4 +178,4 @@ async function doUpdate(){const repo=db.repo||DEFREPO,cb='?t='+Date.now(),raw=b=
   localStorage.setItem('upd',JSON.stringify({v,files:{'core.js':c,'app.js':a}}));alert('Updated from version '+APP_VERSION+' to '+v+'. Restarting. Your data is kept.');location.reload()}
  catch(e){alert('Could not update: '+e.message+'\nCheck internet. In the APK the repo must be public ('+repo+', branch main). New files can take 1-2 minutes to appear on GitHub.')}}
 if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js');
-render();sync();
+render();sync();syncSoon(1500);document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncSoon(1000)});addEventListener('online',()=>syncSoon(1000));setInterval(()=>{if(!document.hidden)syncNow(false)},3e5);
