@@ -1,0 +1,5 @@
+{"name":"training-scheduler","version":"1.0.0","description":"Training Scheduler","author":"m9r1u5","main":"main.js",
+"devDependencies":{"electron":"^31.0.0","electron-builder":"^24.13.3"},
+"build":{"appId":"com.m9r1u5.scheduler.desktop","productName":"Training Scheduler","files":["main.js","www/**/*"],
+"win":{"target":"nsis","icon":"www/icon.png"},
+"nsis":{"oneClick":true,"perMachine":false,"artifactName":"Training-Scheduler.exe","shortcutName":"Training Scheduler"}}}

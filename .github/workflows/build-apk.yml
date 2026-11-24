@@ -1,10 +1,10 @@
-name: Build APK
+name: Build APK and Windows EXE
 on:
   push: {branches: [main]}
   workflow_dispatch:
 permissions: {contents: write}
 jobs:
-  build:
+  android:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,5 +36,41 @@ jobs:
       - run: cp android/app/build/outputs/apk/debug/app-debug.apk scheduler.apk
       - uses: actions/upload-artifact@v4
         with: {name: scheduler-apk, path: scheduler.apk}
+
+  windows:
+    runs-on: windows-latest
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 20}
+      - name: Assemble desktop app from the same web files
+        shell: bash
+        run: |
+          mkdir -p desktop/www
+          cp electron-main.js desktop/main.js
+          cp desktop-package.json desktop/package.json
+          cp index.html core.js app.js manifest.json sw.js icon.svg icon.png desktop/www/
+      - name: Build Windows installer
+        shell: bash
+        working-directory: desktop
+        run: |
+          npm install
+          npx electron-builder --win nsis --publish never
+      - uses: actions/upload-artifact@v4
+        with: {name: scheduler-exe, path: desktop/dist/Training-Scheduler.exe}
+
+  release:
+    needs: [android, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: {path: release-files, merge-multiple: true}
       - uses: softprops/action-gh-release@v2
-        with: {tag_name: "build-${{ github.run_number }}", name: "Build ${{ github.run_number }}", files: scheduler.apk}
+        with:
+          tag_name: "build-${{ github.run_number }}"
+          name: "Build ${{ github.run_number }}"
+          files: |
+            release-files/scheduler.apk
+            release-files/Training-Scheduler.exe
